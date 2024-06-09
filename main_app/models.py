@@ -165,3 +165,13 @@ class ImagenReclamo(models.Model):
 class ImagenPromocion(models.Model):
     imagen = models.ImageField(upload_to='promociones/')
     promocion = models.ForeignKey(Promocion, on_delete=models.CASCADE)
+
+
+class UserRegisterCode(models.Model):
+    user = models.ForeignKey(GMUser, on_delete=models.CASCADE)
+    code = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.code}"

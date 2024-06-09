@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import status
-from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio
+from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode
 from django.db import transaction
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -23,7 +23,17 @@ def generar_clave(length=8):
     characters = string.ascii_letters + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
 
+
 class VecinoRegisterView(APIView):
+    '''
+    Permite a un vecino registrarse en la aplicación.
+    Este endpoint debe ser utilizado para los vecinos que aún no tienen una cuenta.
+    Una vez se verifica que el vecino existe en la base de datos
+    se crea el usuario pero se espera a que sea aceptado por el municipio.
+    Una vez el municipio lo acepta, se genera una clave de
+    8 dígitos la cual es enviada al email que el vecino indicó al momento de registrarse
+    '''
+
     def post(self, request):
         data = request.data
         serializer = UserSerializer(data=data, partial=True)
@@ -45,18 +55,19 @@ class VecinoRegisterView(APIView):
                 serializer.save()
                 user = get_user_model().objects.get(email=request.data['email'])
                 password = generar_clave()
-                user.set_password(password)
                 user.user_type = 1
                 user.save()
                 vecino.usuario = user
                 vecino.save()
 
+                UserRegisterCode.objects.create(user=user, code=password)
+
                 mail = 'fedesolanes1@gmail.com'
                 em = EmailMessage()
                 em['From'] = mail
                 em['To'] = user.email
-                em['Subject'] = 'Clave de acceso'
-                em.set_content(f'Su clave de acceso es: {password}')
+                em['Subject'] = 'Configura tu contraseña'
+                em.set_content(f'Su clave para configurar contraseña es: {password}')
 
                 context = ssl.create_default_context()
 
@@ -66,12 +77,99 @@ class VecinoRegisterView(APIView):
                     server.login(mail, password)
                     server.sendmail(mail, user.email, em.as_string())
 
-                return Response({'detail': 'Registro exitoso'}, status=status.HTTP_201_CREATED)
+                return Response(
+                    {'detail': 'Registro exitoso'},
+                    status=status.HTTP_201_CREATED
+                )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class VecinoSetPasswordView(APIView):
+    '''
+    Permite a un vecino configurar su contraseña.
+    Este endpoint requiere que el vecino haya sido aceptado previamente por el municipio.
+    '''
+
+    def post(self, request):
+        data = request.data
+        try:
+            code = UserRegisterCode.objects.get(code=data['code'])
+        except UserRegisterCode.DoesNotExist:
+            return Response(
+                {'detail': 'No existe un código de registro con este valor'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not code.used:
+            user = code.user
+            user.set_password(data['password'])
+            user.save()
+            code.used = True
+            code.save()
+            return Response(
+                {'detail': 'Contraseña configurada correctamente'},
+                status=status.HTTP_200_OK
+            )
+
+
+class SendCodeForChangePasswordView(APIView):
+    '''
+    Permite a un vecino solicitar un código para cambiar su contraseña.
+    Este endpoint requiere que el vecino haya sido aceptado previamente por el municipio.
+    '''
+
+    def post(self, request):
+        data = request.data
+        try:
+            user = get_user_model().objects.get(email=data['email'])
+            if user.user_type == 1:
+                code = generar_clave()
+                UserRegisterCode.objects.create(user=user, code=code)
+                mail = 'fedesolanes1@gmail.com'
+                em = EmailMessage()
+                em['From'] = mail
+                em['To'] = user.email
+                em['Subject'] = 'Configura tu contraseña'
+                em.set_content(f'Su clave para configurar contraseña es: {password}')
+            else:
+                return Response(
+                    {'detail': 'Acceso denegado para este tipo de usuario'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except get_user_model().DoesNotExist:
+            return Response(
+                {'detail': 'No existe un usuario con este email'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class ChangePasswordView(APIView):
+    '''
+    Endpoint de cambio de contraseña: solo necesita contraseña nueva sin código, autentica con el token
+    '''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        user = request.user
+        user.set_password(data['password'])
+        user.save()
+        return Response(
+            {'detail': 'Contraseña cambiada correctamente'},
+            status=status.HTTP_200_OK
+        )
+
+
 class VecinoLoginView(TokenObtainPairView):
+    '''
+    Permite a un vecino iniciar sesión en la aplicación.
+    Este endpoint requiere que el vecino tenga una
+    cuenta registrada y aceptada previamente por el municipio.
+    '''
+
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
@@ -91,6 +189,7 @@ class VecinoLoginView(TokenObtainPairView):
             )
 
         return response
+
 
 class PersonalRegisterView(APIView):
     def post(self, request):
@@ -129,7 +228,12 @@ class PersonalRegisterView(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class PersonalLoginView(TokenObtainPairView):
+    '''
+    Permite a un inspector iniciar sesión en la aplicación.
+    Este endpoint requiere que el inspector tenga una cuenta registrada.
+    '''
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
@@ -150,9 +254,12 @@ class PersonalLoginView(TokenObtainPairView):
 
         return response
 
+
 class ReclamoView(APIView):
+    '''Vista para crear o obtener un reclamo'''
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
+
 
     def post(self, request):
         data = request.data
@@ -176,14 +283,20 @@ class ReclamoView(APIView):
         reclamo_serializer = ReclamoSerializer(reclamo)
         imagenes = ImagenReclamo.objects.filter(reclamo=reclamo)
         imagenes_serializer = ImagenReclamoSerializer(imagenes, many=True)
-        return Response({'reclamo': reclamo_serializer.data, 'imagenes': imagenes_serializer.data}, status=status.HTTP_200_OK)
+        return Response({'reclamo': reclamo_serializer.data,
+                         'imagenes': imagenes_serializer.data},
+                          status=status.HTTP_200_OK
+                        )
 
-class ReclamosView(APIView):
+
+class GetReclamosView(APIView):
+    '''Vista para obtener todos los reclamos de un vecino'''
+
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        reclamos = Reclamo.objects.filter(vecino__user=user)
+        reclamos = Reclamo.objects.filter(vecino__usuario=user)
         serializer = ReclamoSerializer(reclamos, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
