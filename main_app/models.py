@@ -2,6 +2,12 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import BaseUserManager
+import random
+import string
+
+def generar_clave(length=8):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -47,7 +53,7 @@ class Vecino(models.Model):
     apellido = models.CharField(max_length=100)
     direccion = models.CharField(max_length=100)
     barrio = models.ForeignKey(Barrio, on_delete=models.CASCADE)
-    usuario = models.ForeignKey(GMUser, on_delete=models.CASCADE, null=True, blank=True)
+    usuario = models.ForeignKey(GMUser, on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return self.nombre + ' ' + self.apellido
@@ -69,15 +75,17 @@ class Desperfecto(models.Model):
 
 
 class Personal(models.Model):
+    class Meta:
+        verbose_name_plural = 'Personal'
+
     legajo = models.CharField(primary_key=True, max_length=30)
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     documento = models.CharField(max_length=20)
-    password = models.CharField(max_length=100)
     sector = models.CharField(max_length=100)
     categoria = models.CharField(max_length=100)
     fechaIngreso = models.DateField()
-    usuario = models.ForeignKey(GMUser, on_delete=models.CASCADE,null=True, blank=True)
+    usuario = models.ForeignKey(GMUser, on_delete=models.SET_NULL,null=True, blank=True)
 
     def __str__(self):
         return f"{self.legajo} {self.nombre} {self.apellido}"
@@ -149,6 +157,8 @@ class MovimientoDenuncia(models.Model):
         return f"Movimiento #{self.id}"
 
 class Promocion(models.Model):
+    class Meta:
+        verbose_name_plural = 'Promociones'
     descripcion = models.CharField(max_length=1000)
     horarios = models.CharField(max_length=30)
     vecino = models.ForeignKey(Vecino, on_delete=models.CASCADE)
@@ -163,6 +173,9 @@ class ImagenReclamo(models.Model):
     reclamo = models.ForeignKey(Reclamo, on_delete=models.CASCADE)
 
 class ImagenPromocion(models.Model):
+    class Meta:
+        verbose_name_plural = 'Imagen promociones'
+
     imagen = models.ImageField(upload_to='promociones/')
     promocion = models.ForeignKey(Promocion, on_delete=models.CASCADE)
 
@@ -175,3 +188,9 @@ class UserRegisterCode(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.code}"
+
+    def save(self, *args, **kwargs):
+        UserRegisterCode.objects.filter(user=self.user, used=False).delete()
+        while UserRegisterCode.objects.filter(code=self.code).exists():
+            self.code = generar_clave()
+        return super().save(*args, **kwargs)

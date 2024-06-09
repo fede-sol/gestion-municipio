@@ -1,11 +1,12 @@
 from django.urls import re_path
-from .views import (VecinoRegisterView, VecinoLoginView, PersonalLoginView,
+from .views import (VecinoRegisterView, VecinoLoginView, PersonalLoginView, PersonalRegisterView,
                     ReclamoView, GetReclamosView, VecinoSetPasswordView,
                     SendCodeForChangePasswordView, ChangePasswordView,)
 urlpatterns = [
     re_path('registro', VecinoRegisterView.as_view()),
     re_path('vecino/login', VecinoLoginView.as_view()),
     re_path('personal/login/', PersonalLoginView.as_view()),
+    re_path('personal/register/', PersonalRegisterView.as_view()),
     re_path('reclamo', ReclamoView.as_view()),
     re_path('reclamos', GetReclamosView.as_view()),
     re_path('vecino/set-password', VecinoSetPasswordView.as_view()),

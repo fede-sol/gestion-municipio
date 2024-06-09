@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 import ssl
 import smtplib
 import os
+from .permissions import IsVecino
 
 load_dotenv()
 
@@ -65,17 +66,16 @@ class VecinoRegisterView(APIView):
                 mail = 'fedesolanes1@gmail.com'
                 em = EmailMessage()
                 em['From'] = mail
-                em['To'] = user.email
+                em['To'] = request.data['email']
                 em['Subject'] = 'Configura tu contraseña'
                 em.set_content(f'Su clave para configurar contraseña es: {password}')
 
                 context = ssl.create_default_context()
 
-                password=os.getenv('EMAIL_PASSWORD')
 
                 with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as server:
-                    server.login(mail, password)
-                    server.sendmail(mail, user.email, em.as_string())
+                    server.login(mail, os.getenv('EMAIL_PASSWORD'))
+                    server.sendmail(mail, request.data['email'], em.as_string())
 
                 return Response(
                     {'detail': 'Registro exitoso'},
@@ -131,7 +131,17 @@ class SendCodeForChangePasswordView(APIView):
                 em['From'] = mail
                 em['To'] = user.email
                 em['Subject'] = 'Configura tu contraseña'
-                em.set_content(f'Su clave para configurar contraseña es: {password}')
+                em.set_content(f'Su clave para configurar contraseña es: {code}')
+                context = ssl.create_default_context()
+
+
+                with smtplib.SMTP_SSL('smtp.gmail.com', 465, context=context) as server:
+                    server.login(mail, os.getenv('EMAIL_PASSWORD'))
+                    server.sendmail(mail, request.data['email'], em.as_string())
+                return Response(
+                    {'detail': 'Código enviado correctamente'},
+                    status=status.HTTP_200_OK
+                )
             else:
                 return Response(
                     {'detail': 'Acceso denegado para este tipo de usuario'},
@@ -150,7 +160,7 @@ class ChangePasswordView(APIView):
     '''
 
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsVecino]
 
     def post(self, request):
         data = request.data
@@ -238,8 +248,10 @@ class PersonalLoginView(TokenObtainPairView):
 
     def post(self, request, *args, **kwargs):
         try:
-            user = get_user_model().objects.get(email=request.data['email'])
+            personal = Personal.objects.get(legajo=request.data['legajo'])
+            user = personal.usuario
             if user.user_type == 2:
+                request.data['email'] = user.email
                 response = super().post(request, *args, **kwargs)
             else:
                 response = Response(
@@ -248,7 +260,12 @@ class PersonalLoginView(TokenObtainPairView):
                 )
         except get_user_model().DoesNotExist:
             response = Response(
-                {'detail': 'No user with this email exists.'},
+                {'detail': 'No existe un usuario con ese legajo'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Personal.DoesNotExist:
+            response = Response(
+                {'detail': 'No existe un inspector con ese legajo'},
                 status=status.HTTP_404_NOT_FOUND
             )
 

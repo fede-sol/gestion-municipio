@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Barrio, Desperfecto, Rubro, Vecino, GMUser, Personal, Sitio, Reclamo, ImagenReclamo, ImagenPromocion, Promocion
+from .models import Barrio, Desperfecto, Rubro, Vecino, GMUser, Personal, Sitio, Reclamo, ImagenReclamo, ImagenPromocion, Promocion, UserRegisterCode
 
 admin.site.register(Barrio)
 admin.site.register(Desperfecto)
@@ -12,3 +12,4 @@ admin.site.register(Reclamo)
 admin.site.register(ImagenReclamo)
 admin.site.register(ImagenPromocion)
 admin.site.register(Promocion)
+admin.site.register(UserRegisterCode)
