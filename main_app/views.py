@@ -215,7 +215,7 @@ class PersonalRegisterView(APIView):
             try:
                 personal = Personal.objects.get(legajo=data['legajo'])
 
-                if personal.usuario:
+                if UserPersonal.objects.filter(personal=personal).exists():
                     return Response(
                         {'detail': 'Ya existe un inspector con este legajo'},
                         status=status.HTTP_400_BAD_REQUEST
@@ -261,7 +261,7 @@ class PersonalLoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         try:
             personal = Personal.objects.get(legajo=request.data['legajo'])
-            user = personal.usuario
+            user = UserPersonal.objects.get(personal=personal).user
             if user.user_type == 2:
                 request.data['email'] = user.email
                 response = super().post(request, *args, **kwargs)
@@ -278,6 +278,11 @@ class PersonalLoginView(TokenObtainPairView):
         except Personal.DoesNotExist:
             response = Response(
                 {'detail': 'No existe un inspector con ese legajo'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except UserPersonal.DoesNotExist:
+            response = Response(
+                {'detail': 'El inspector no tiene cuenta'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
