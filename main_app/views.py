@@ -263,7 +263,6 @@ class PersonalLoginView(TokenObtainPairView):
             personal = Personal.objects.get(legajo=request.data['legajo'])
             user = UserPersonal.objects.get(personal=personal)
             if user.user and user.user.user_type == 2:
-                request.data['email'] = user.email
                 response = super().post(request, *args, **kwargs)
             else:
                 response = Response(
