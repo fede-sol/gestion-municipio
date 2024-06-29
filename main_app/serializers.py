@@ -13,12 +13,12 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['email'] = self.user.email
 
         if self.user.user_type == 1:
-            vecino = Vecino.objects.get(usuario=self.user)
+            vecino = UserVecino.objects.get(user=self.user).vecino
             data['nombre'] = vecino.nombre
             data['apellido'] = vecino.apellido
             data['documento'] = vecino.documento
         else:
-            personal = Personal.objects.get(usuario=self.user)
+            personal = UserPersonal.objects.get(user=self.user).personal
             data['nombre'] = personal.nombre
             data['apellido'] = personal.apellido
             data['legajo'] = personal.legajo
