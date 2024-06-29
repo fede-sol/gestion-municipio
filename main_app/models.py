@@ -54,13 +54,8 @@ class Vecino(models.Model):
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     direccion = models.CharField(max_length=100)
-<<<<<<< HEAD
     barrio = models.ForeignKey(Barrio, on_delete=models.CASCADE,
                                db_column='codigo_barrio')
-=======
-    barrio = models.ForeignKey(Barrio, on_delete=models.CASCADE)
-    usuario = models.ForeignKey(GMUser, on_delete=models.SET_NULL, null=True, blank=True)
->>>>>>> cfdbcc650f544e68b896d1f20db93fad87619ab2
 
     def __str__(self):
         return self.nombre + ' ' + self.apellido
@@ -100,10 +95,6 @@ class Personal(models.Model):
     sector = models.CharField(max_length=100)
     categoria = models.CharField(max_length=100)
     fechaIngreso = models.DateField()
-<<<<<<< HEAD
-=======
-    usuario = models.ForeignKey(GMUser, on_delete=models.SET_NULL,null=True, blank=True)
->>>>>>> cfdbcc650f544e68b896d1f20db93fad87619ab2
 
     def __str__(self):
         return f"{self.legajo} {self.nombre} {self.apellido}"
@@ -227,7 +218,12 @@ class UserRegisterCode(models.Model):
     def __str__(self):
         return f"{self.user.email} - {self.code}"
 
-<<<<<<< HEAD
+    def save(self, *args, **kwargs):
+        UserRegisterCode.objects.filter(user=self.user, used=False).delete()
+        while UserRegisterCode.objects.filter(code=self.code).exists():
+            self.code = generar_clave()
+        return super().save(*args, **kwargs)
+
 
 class Notification(models.Model):
     user = models.ForeignKey(GMUser, on_delete=models.CASCADE)
@@ -306,10 +302,3 @@ def create_denuncia_notification(sender, instance, created, **kwargs):
             title="Actualización de su denuncia",
             message=message,
         )
-=======
-    def save(self, *args, **kwargs):
-        UserRegisterCode.objects.filter(user=self.user, used=False).delete()
-        while UserRegisterCode.objects.filter(code=self.code).exists():
-            self.code = generar_clave()
-        return super().save(*args, **kwargs)
->>>>>>> cfdbcc650f544e68b896d1f20db93fad87619ab2
