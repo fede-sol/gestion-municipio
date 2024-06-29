@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.conf import settings
-from .models import Reclamo, Vecino, Personal, Rubro, Desperfecto, Barrio, Denuncia, DenunciadoReclamo, DenunciaImagen, Promocion, ImagenReclamo, ImagenPromocion, Notification
+from .models import Reclamo, Vecino, Personal, Rubro, Desperfecto, Barrio, Denuncia, DenunciadoReclamo, DenunciaImagen, Promocion, ImagenReclamo, ImagenPromocion, Notification, UserVecino, UserPersonal
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
@@ -33,14 +33,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['email'] = user.email
         token['username'] = user.username
         if user.user_type == 1:
-            vecino = Vecino.objects.get(usuario=user)
+            vecino = UserVecino.objects.get(user=user).vecino
             token['nombre'] = vecino.nombre
             token['apellido'] = vecino.apellido
             token['documento'] = vecino.documento
             token['direccion'] = vecino.direccion
             token['rol'] = 'vecino'
         else:
-            personal = Personal.objects.get(usuario=user)
+            personal = UserPersonal.objects.get(user=user).personal
             token['nombre'] = personal.nombre
             token['apellido'] = personal.apellido
             token['legajo'] = personal.legajo
