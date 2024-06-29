@@ -1,13 +1,13 @@
 import random
 import string
 from rest_framework.response import Response
-from .serializers import UserSerializer, CustomTokenObtainPairSerializer, VecinoSerializer, PersonalSerializer, RubroSerializer, DesperfectoSerializer, BarrioSerializer, ReclamoSerializer, ImagenReclamoSerializer
+from .serializers import UserSerializer, CustomTokenObtainPairSerializer, VecinoSerializer, PersonalSerializer, RubroSerializer, DesperfectoSerializer, BarrioSerializer, ReclamoSerializer, ImagenReclamoSerializer, DenunciaSerializer, DenunciaImagenSerializer, PromocionSerializer, PromocionImagenSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import status
-from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode
+from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode, UserVecino, UserPersonal, Denuncia, DenunciaImagen, Notification
 from django.db import transaction
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -57,8 +57,14 @@ class VecinoRegisterView(APIView):
                 password = generar_clave()
                 user.user_type = 1
                 user.save()
-                vecino.usuario = user
-                vecino.save()
+
+                try:
+                    user_vecino = UserVecino.objects.create(user=user, vecino=vecino)
+                except:
+                    return Response(
+                        {'detail': 'Error interno'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
                 UserRegisterCode.objects.create(user=user, code=password)
 
@@ -215,8 +221,14 @@ class PersonalRegisterView(APIView):
                 user.set_password(request.data['password'])
                 user.user_type = 2
                 user.save()
-                personal.usuario = user
-                personal.save()
+                try:
+                    user_personal = UserPersonal.objects.create(user=user, personal=personal)
+                except:
+                    return Response(
+                        {'detail': 'Error interno'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
                 token = CustomTokenObtainPairSerializer().get_token(user)
                 return Response({
                     'access': str(token.access_token),
@@ -289,6 +301,43 @@ class ReclamoView(APIView):
                         )
 
 
+class ReclamoAddImage(APIView):
+    '''Vista para agregar una imagen a un reclamo'''
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        try:
+            reclamo = Reclamo.objects.get(id=data['numero_reclamo'])
+        except Reclamo.DoesNotExist:
+            return Response(
+                {'detail': 'No existe un reclamo con ese número.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if ImagenReclamo.objects.filter(reclamo=reclamo).count() >= 7:
+            return Response(
+                {'detail': 'El usuario vecino llegó al límite de 7 imágenes.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        imagen = data['imagen']
+        try:
+            ImagenReclamo.objects.create(reclamo=reclamo, imagen=imagen)
+        except:
+            return Response(
+                {'detail': 'Error interno'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            {'detail': 'La imagen se agregó exitosamente.'},
+            status=status.HTTP_201_CREATED
+        )
+
+
+
 class GetReclamosView(APIView):
     '''Vista para obtener todos los reclamos de un vecino'''
 
@@ -299,4 +348,207 @@ class GetReclamosView(APIView):
         user = request.user
         reclamos = Reclamo.objects.filter(vecino__usuario=user)
         serializer = ReclamoSerializer(reclamos, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CrearDenunciaView(APIView):
+    '''Vista para crear una denuncia'''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        serializer = DenunciaSerializer(data=data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DenunciaImagenView(APIView):
+    '''Vista para agregar una imagen a una denuncia'''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        try:
+            denuncia = Denuncia.objects.get(id=data['numero_denuncia'])
+        except Denuncia.DoesNotExist:
+            return Response(
+                {'detail': 'No existe una denuncia con ese número.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if DenunciaImagenView.objects.filter(denuncia=denuncia).count() >= 7:
+            return Response(
+                {'detail': 'El usuario vecino llegó al límite de 7 imágenes.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        imagen = data['imagen']
+        try:
+            DenunciaImagen.objects.create(denuncia=denuncia, imagen=imagen)
+        except:
+            return Response(
+                {'detail': 'Error interno'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            {'detail': 'La imagen se agregó exitosamente.'},
+            status=status.HTTP_201_CREATED
+        )
+
+
+class GetDenunciaView(APIView):
+    '''Vista para obtener una denuncia por pk'''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            denuncia = Denuncia.objects.get(id=pk)
+        except Denuncia.DoesNotExist:
+            return Response(
+                {'detail': 'No existe esa denuncia'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        denuncia_serializer = DenunciaSerializer(denuncia)
+        imagenes = DenunciaImagen.objects.filter(denuncia=denuncia)
+        imagenes_serializer = DenunciaImagenSerializer(imagenes, many=True)
+        return Response({'denuncia': denuncia_serializer.data,
+                         'imagenes': imagenes_serializer.data},
+                          status=status.HTTP_200_OK
+                        )
+
+
+class GetDenunciasListView(APIView):
+    '''Permite obtener una lista de todas las denuncias registradas, tanto las generadas por el mismo usuario, como las que le fueron generadas en su contra; para controlar esto se pasa un parámetro llamado "tipo". Este endpoint requiere que el usuario esté autenticado.'''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        tipo = request.query_params.get('tipo')
+        user = request.user
+
+        if tipo == 'generadas':
+            denuncias = Denuncia.objects.filter(denunciante__usuario=user)
+        elif tipo == 'recibidas':
+            denuncias = Denuncia.objects.filter(denunciado__usuario=user)
+        else:
+            return Response(
+                {'detail': 'Parámetro "tipo" no válido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = DenunciaSerializer(denuncias, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CreatePromocionView(APIView):
+    '''Vista para crear una promoción'''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        serializer = PromocionSerializer(data=data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PromocionImagenView(APIView):
+    '''Vista para agregar una imagen a una promoción'''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        data = request.data
+        try:
+            promocion = Promocion.objects.get(id=data['numero_promocion'])
+        except Promocion.DoesNotExist:
+            return Response(
+                {'detail': 'No existe una promoción con ese número.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if ImagenPromocion.objects.filter(promocion=promocion).count() >= 7:
+            return Response(
+                {'detail': 'El usuario vecino llegó al límite de 7 imágenes.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        imagen = data['imagen']
+        try:
+            ImagenPromocion.objects.create(promocion=promocion, imagen=imagen)
+        except:
+            return Response(
+                {'detail': 'Error interno'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            {'detail': 'La imagen se agregó exitosamente.'},
+            status=status.HTTP_201_CREATED
+        )
+
+
+class GetPromocionView(APIView):
+    '''Vista para obtener una promoción por pk'''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            promocion = Promocion.objects.get(id=pk)
+        except Promocion.DoesNotExist:
+            return Response(
+                {'detail': 'No existe esa promoción'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        promocion_serializer = PromocionSerializer(promocion)
+        imagenes = ImagenPromocion.objects.filter(promocion=promocion)
+        imagenes_serializer = PromocionImagenSerializer(imagenes, many=True)
+        return Response({'promocion': promocion_serializer.data,
+                         'imagenes': imagenes_serializer.data},
+                          status=status.HTTP_200_OK
+                        )
+
+
+class GetPromocionListView(APIView):
+    '''Obtiene una lista de todas las promociones registradas. Este endpoint está disponible para cualquier usuario, incluso sin autenticación.'''
+
+    def get(self, request):
+        promociones = Promocion.objects.all()
+        serializer = PromocionSerializer(promociones, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class GetNotifications(APIView):
+    '''Obtiene todas las notificaciones de un usuario'''
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        notifications = Notification.objects.filter(user=user)
+        serializer = NotificationSerializer(notifications, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

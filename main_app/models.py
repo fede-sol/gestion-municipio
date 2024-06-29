@@ -2,6 +2,8 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import BaseUserManager
+from django.dispatch import receiver
+from django.db.models.signals import post_save
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -46,12 +48,19 @@ class Vecino(models.Model):
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     direccion = models.CharField(max_length=100)
-    barrio = models.ForeignKey(Barrio, on_delete=models.CASCADE)
-    usuario = models.ForeignKey(GMUser, on_delete=models.CASCADE, null=True, blank=True)
+    barrio = models.ForeignKey(Barrio, on_delete=models.CASCADE,
+                               db_column='codigo_barrio')
 
     def __str__(self):
         return self.nombre + ' ' + self.apellido
 
+
+class UserVecino(models.Model):
+    user = models.ForeignKey(GMUser, on_delete=models.CASCADE)
+    vecino = models.ForeignKey(Vecino, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.user.email
 
 
 class Rubro(models.Model):
@@ -59,6 +68,7 @@ class Rubro(models.Model):
 
     def __str__(self):
         return self.descripcion
+
 
 class Desperfecto(models.Model):
     descripcion = models.TextField()
@@ -77,10 +87,17 @@ class Personal(models.Model):
     sector = models.CharField(max_length=100)
     categoria = models.CharField(max_length=100)
     fechaIngreso = models.DateField()
-    usuario = models.ForeignKey(GMUser, on_delete=models.CASCADE,null=True, blank=True)
 
     def __str__(self):
         return f"{self.legajo} {self.nombre} {self.apellido}"
+
+class UserPersonal(models.Model):
+    user = models.ForeignKey(GMUser, on_delete=models.CASCADE)
+    personal = models.ForeignKey(Personal, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.user.email
+
 
 class Sitio(models.Model):
     latitud = models.DecimalField(max_digits=10, decimal_places=8)
@@ -104,13 +121,13 @@ class Reclamo(models.Model):
       (2, 'Abierto'),
       (3, 'Cerrado'),
     )
-    vecino = models.ForeignKey(Vecino, on_delete=models.CASCADE)
+    vecino = models.ForeignKey(Vecino, on_delete=models.CASCADE, db_column='documento')
     sitio = models.ForeignKey(Sitio, on_delete=models.CASCADE)
     desperfecto = models.ForeignKey(Desperfecto, on_delete=models.CASCADE)
     descripcion = models.TextField()
     estado = models.PositiveSmallIntegerField(choices=estados_reclamo,default=1)
     idReclamoUnificado = models.IntegerField()
-    personal = models.ForeignKey(Personal, on_delete=models.CASCADE)
+    personal = models.ForeignKey(Personal, on_delete=models.CASCADE, db_column='legajo')
 
     def __str__(self):
         return f"Reclamo #{self.id}"
@@ -129,15 +146,27 @@ class Denuncia(models.Model):
       (1, 'Abierta'),
       (2, 'Cerrada'),
     )
-    denunciante = models.ForeignKey(GMUser, on_delete=models.CASCADE)
-    denunciado = models.ForeignKey(Vecino, on_delete=models.CASCADE)
+    denunciante = models.ForeignKey(Vecino, on_delete=models.CASCADE, db_column='documento')
     sitio = models.ForeignKey(Sitio, on_delete=models.CASCADE)
     descripcion = models.TextField()
-    estado = models.PositiveSmallIntegerField(choices=estados_denuncia,default=1)
+    estado = models.PositiveSmallIntegerField(choices=estados_denuncia,
+                                              default=1)
     aceptaResponsabilidad = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Denuncia #{self.id}"
+
+class DenunciadoReclamo(models.Model):
+    denuncia = models.ForeignKey(Denuncia, on_delete=models.CASCADE)
+    denunciado = models.ForeignKey(Vecino, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"Denunciado #{self.id}"
+
+
+class DenunciaImagen(models.Model):
+    imagen = models.ImageField(upload_to='denuncias/')
+    denuncia = models.ForeignKey(Denuncia, on_delete=models.CASCADE)
 
 class MovimientoDenuncia(models.Model):
     denuncia = models.ForeignKey(Denuncia, on_delete=models.CASCADE)
@@ -175,3 +204,82 @@ class UserRegisterCode(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.code}"
+
+
+class Notification(models.Model):
+    user = models.ForeignKey(GMUser, on_delete=models.CASCADE)
+    title = models.CharField(max_length=100)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.title}"
+
+
+# Define clear and descriptive messages for each notification
+NOTIFICATION_MESSAGES = {
+    'Reclamo': {
+        1: "Su reclamo ha sido enviado para revisión.",
+        2: "Su reclamo ha sido abierto y está siendo procesado.",
+        3: "Su reclamo ha sido cerrado.",
+    },
+    'Denuncia': {
+        1: "Su denuncia ha sido registrada.",
+        2: "Su denuncia ha sido cerrada.",
+    },
+}
+
+
+@receiver(post_save, sender=Reclamo)
+def create_reclamo_notification(sender, instance, created, **kwargs):
+    """
+    Creates a notification for the Reclamo owner when its state changes.
+
+    Args:
+        sender (Model): The Reclamo model class.
+        instance (Reclamo): The Reclamo instance being saved.
+        created (bool): Whether the instance is newly created.
+        kwargs (dict): Additional arguments passed to the signal handler.
+    """
+
+    if created:
+        return  # Don't create notification for initial creation
+
+    old_state = Reclamo.objects.filter(pk=instance.pk).get().estado
+    new_state = instance.estado
+
+    if old_state != new_state:
+        message = NOTIFICATION_MESSAGES['Reclamo'].get(new_state)
+        Notification.objects.create(
+            user=instance.vecino.user,
+            title="Actualización de su reclamo",
+            message=message,
+        )
+
+
+@receiver(post_save, sender=Denuncia)
+def create_denuncia_notification(sender, instance, created, **kwargs):
+    """
+    Creates a notification for the Denuncia owner when its state changes.
+
+    Args:
+        sender (Model): The Denuncia model class.
+        instance (Denuncia): The Denuncia instance being saved.
+        created (bool): Whether the instance is newly created.
+        kwargs (dict): Additional arguments passed to the signal handler.
+    """
+
+    if created:
+        return  # Don't create notification for initial creation
+
+    old_state = Denuncia.objects.filter(pk=instance.pk).get().estado
+    new_state = instance.estado
+
+    if old_state != new_state:
+        message = NOTIFICATION_MESSAGES['Denuncia'].get(new_state)
+        Notification.objects.create(
+            user=instance.denunciante.user,
+            title="Actualización de su denuncia",
+            message=message,
+        )
