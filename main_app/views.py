@@ -41,8 +41,8 @@ class VecinoRegisterView(APIView):
         if serializer.is_valid():
             try:
                 vecino = Vecino.objects.get(documento=data['documento'])
-
-                if vecino.usuario:
+                usuario_vecino = UserVecino.objects.filter(vecino=vecino)
+                if usuario_vecino.exists():
                     return Response(
                         {'detail': 'Ya existe un vecino con este documento'},
                         status=status.HTTP_400_BAD_REQUEST
