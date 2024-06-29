@@ -16,13 +16,38 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             vecino = Vecino.objects.get(usuario=self.user)
             data['nombre'] = vecino.nombre
             data['apellido'] = vecino.apellido
+            data['documento'] = vecino.documento
         else:
             personal = Personal.objects.get(usuario=self.user)
             data['nombre'] = personal.nombre
             data['apellido'] = personal.apellido
+            data['legajo'] = personal.legajo
 
 
         return data
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        token['email'] = user.email
+        token['username'] = user.username
+        if user.user_type == 1:
+            vecino = Vecino.objects.get(usuario=user)
+            token['nombre'] = vecino.nombre
+            token['apellido'] = vecino.apellido
+            token['documento'] = vecino.documento
+            token['direccion'] = vecino.direccion
+            token['rol'] = 'vecino'
+        else:
+            personal = Personal.objects.get(usuario=user)
+            token['nombre'] = personal.nombre
+            token['apellido'] = personal.apellido
+            token['legajo'] = personal.legajo
+            token['rol'] = 'personal'
+
+
+        return token
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta(object):
