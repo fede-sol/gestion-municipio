@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.conf import settings
-from .models import Reclamo, Vecino, Personal, Rubro, Desperfecto, Barrio, Denuncia, DenunciadoReclamo, DenunciaImagen, Promocion, ImagenReclamo
+from .models import Reclamo, Vecino, Personal, Rubro, Desperfecto, Barrio, Denuncia, DenunciadoReclamo, DenunciaImagen, Promocion, ImagenReclamo, ImagenPromocion, Notification
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
@@ -86,7 +86,7 @@ class ReclamoSerializer(serializers.ModelSerializer):
 
 class ImagenReclamoSerializer(serializers.ModelSerializer):
     class Meta(object):
-        model = Reclamo
+        model = ImagenReclamo
         fields = '__all__'
 
 
@@ -110,5 +110,11 @@ class PromocionSerializer(serializers.ModelSerializer):
 
 class PromocionImagenSerializer(serializers.ModelSerializer):
     class Meta(object):
-        model = Promocion
+        model = ImagenPromocion
+        fields = '__all__'
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta(object):
+        model = Notification
         fields = '__all__'
