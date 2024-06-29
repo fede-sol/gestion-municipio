@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Barrio, Desperfecto, Rubro, Vecino, GMUser, Personal, Sitio, Reclamo, ImagenReclamo, ImagenPromocion, Promocion, UserRegisterCode
+from .models import Barrio, Desperfecto, Rubro, Vecino, GMUser, Personal, Sitio, Reclamo, ImagenReclamo, ImagenPromocion, Promocion, UserRegisterCode,UserVecino,UserPersonal
 
 admin.site.register(Barrio)
 admin.site.register(Desperfecto)
@@ -12,6 +12,8 @@ admin.site.register(ImagenReclamo)
 admin.site.register(ImagenPromocion)
 admin.site.register(Promocion)
 admin.site.register(UserRegisterCode)
+admin.site.register(UserVecino)
+admin.site.register(UserPersonal)
 
 
 class GMUserAdmin(admin.ModelAdmin):
@@ -23,11 +25,11 @@ class GMUserAdmin(admin.ModelAdmin):
 
     def get_user_info(self, obj):
         if obj.user_type == 1:  # Vecino
-            vecino = Vecino.objects.filter(usuario=obj).first()
+            vecino = UserVecino.objects.filter(user=obj).first().vecino
             if vecino:
                 return f"Documento: {vecino.documento}, Nombre: {vecino.nombre}"
         elif obj.user_type == 2:  # Personal
-            personal = Personal.objects.filter(usuario=obj).first()
+            personal = UserPersonal.objects.filter(user=obj).first().personal
             if personal:
                 return f"Legajo: {personal.legajo}, Nombre: {personal.nombre}"
         return "-"
