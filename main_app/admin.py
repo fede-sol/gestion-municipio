@@ -25,13 +25,13 @@ class GMUserAdmin(admin.ModelAdmin):
 
     def get_user_info(self, obj):
         if obj.user_type == 1:  # Vecino
-            vecino = UserVecino.objects.filter(user=obj).first().vecino
+            vecino = UserVecino.objects.filter(user=obj).first()
             if vecino:
-                return f"Documento: {vecino.documento}, Nombre: {vecino.nombre}"
+                return f"Documento: {vecino.vecino.documento}, Nombre: {vecino.vecino.nombre}"
         elif obj.user_type == 2:  # Personal
-            personal = UserPersonal.objects.filter(user=obj).first().personal
+            personal = UserPersonal.objects.filter(user=obj).first()
             if personal:
-                return f"Legajo: {personal.legajo}, Nombre: {personal.nombre}"
+                return f"Legajo: {personal.personal.legajo}, Nombre: {personal.personal.nombre}"
         return "-"
     get_user_info.short_description = 'User Info'
 
