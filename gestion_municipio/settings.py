@@ -124,7 +124,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 STATIC_URL = '/static/'
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, '')
 
 
 # Default primary key field type
@@ -137,6 +137,11 @@ AUTH_USER_MODEL = 'main_app.GMUser'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+
+STATICFILES_DIRS = (
+  os.path.join(BASE_DIR, 'static'),
+)
 
 CSRF_TRUSTED_ORIGINS = ['https://api-municipio-production.up.railway.app']
 
@@ -168,7 +173,7 @@ CORS_ALLOW_HEADERS = (
     'x-forwarded-host',
     'x-forwarded-port',
     'x-forwarded-prefix',
-    'Authorization',
+    'Authorization'
 )
 
 REST_FRAMEWORK = {

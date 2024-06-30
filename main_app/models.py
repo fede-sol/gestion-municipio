@@ -135,8 +135,20 @@ class Reclamo(models.Model):
     desperfecto = models.ForeignKey(Desperfecto, on_delete=models.CASCADE)
     descripcion = models.TextField()
     estado = models.PositiveSmallIntegerField(choices=estados_reclamo,default=1)
-    idReclamoUnificado = models.IntegerField()
-    personal = models.ForeignKey(Personal, on_delete=models.CASCADE, db_column='legajo')
+    idReclamoUnificado = models.IntegerField(null=True, blank=True)
+    personal = models.ForeignKey(Personal, on_delete=models.SET_NULL, db_column='legajo',null=True, blank=True)
+
+    @property
+    def nombre_vecino(self):
+        return self.vecino.nombre + ' ' + self.vecino.apellido
+
+    @property
+    def nombre_sitio(self):
+        return self.sitio.descripcion
+
+    @property
+    def ubicacion(self):
+        return f"{self.sitio.calle} {self.sitio.numero}"
 
     def __str__(self):
         return f"Reclamo #{self.id}"
@@ -160,14 +172,15 @@ class Denuncia(models.Model):
     descripcion = models.TextField()
     estado = models.PositiveSmallIntegerField(choices=estados_denuncia,
                                               default=1)
-    aceptaResponsabilidad = models.BooleanField(default=False)
+    aceptaResponsabilidad = models.BooleanField(default=False,null=True, blank=True)
 
     def __str__(self):
         return f"Denuncia #{self.id}"
 
-class DenunciadoReclamo(models.Model):
+class Denunciado(models.Model):
     denuncia = models.ForeignKey(Denuncia, on_delete=models.CASCADE)
-    denunciado = models.ForeignKey(Vecino, on_delete=models.CASCADE)
+    denunciado = models.ForeignKey(Vecino, on_delete=models.CASCADE,blank=True, null=True)
+    comercio = models.CharField(max_length=100,blank=True, null=True)
 
     def __str__(self):
         return f"Denunciado #{self.id}"

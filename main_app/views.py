@@ -1,13 +1,13 @@
 import random
 import string
 from rest_framework.response import Response
-from .serializers import UserSerializer, CustomTokenObtainPairSerializer, VecinoSerializer, PersonalSerializer, RubroSerializer, DesperfectoSerializer, BarrioSerializer, ReclamoSerializer, ImagenReclamoSerializer, DenunciaSerializer, DenunciaImagenSerializer, PromocionSerializer, PromocionImagenSerializer, NotificationSerializer
+from .serializers import UserSerializer, CustomTokenObtainPairSerializer, VecinoSerializer, PersonalSerializer, RubroSerializer, DesperfectoSerializer, BarrioSerializer, ReclamoSerializer, ImagenReclamoSerializer, DenunciaSerializer, DenunciaImagenSerializer, PromocionSerializer, PromocionImagenSerializer, NotificationSerializer, MovimientoReclamoSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import status
-from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode, UserVecino, UserPersonal, Denuncia, DenunciaImagen, Notification
+from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode, UserVecino, UserPersonal, Denuncia, DenunciaImagen, Notification, Desperfecto, MovimientoReclamo, Denunciado
 from django.db import transaction
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -294,17 +294,6 @@ class ReclamoView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-
-    def post(self, request):
-        data = request.data
-        serializer = ReclamoSerializer(data=data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
     def get(self, request, pk):
         try:
             reclamo = Reclamo.objects.get(id=pk)
@@ -317,11 +306,29 @@ class ReclamoView(APIView):
         reclamo_serializer = ReclamoSerializer(reclamo)
         imagenes = ImagenReclamo.objects.filter(reclamo=reclamo)
         imagenes_serializer = ImagenReclamoSerializer(imagenes, many=True)
+        movimientos = MovimientoReclamo.objects.filter(reclamo=reclamo)
+        movimientos_serializer = MovimientoReclamoSerializer(movimientos, many=True)
         return Response({'reclamo': reclamo_serializer.data,
-                         'imagenes': imagenes_serializer.data},
+                         'imagenes': imagenes_serializer.data,
+                         'movimientos': movimientos_serializer.data},
                           status=status.HTTP_200_OK
                         )
 
+class CreateReclamoView(APIView):
+    '''Vista para crear o obtener un reclamo'''
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+
+    def post(self, request):
+        data = request.data
+        serializer = ReclamoSerializer(data=data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ReclamoAddImage(APIView):
     '''Vista para agregar una imagen a un reclamo'''
@@ -330,6 +337,7 @@ class ReclamoAddImage(APIView):
 
     def post(self, request):
         data = request.data
+        data._mutable = True
         try:
             reclamo = Reclamo.objects.get(id=data['numero_reclamo'])
         except Reclamo.DoesNotExist:
@@ -343,32 +351,30 @@ class ReclamoAddImage(APIView):
                 {'detail': 'El usuario vecino llegó al límite de 7 imágenes.'},
                 status=status.HTTP_403_FORBIDDEN
             )
+        data['reclamo'] = data['numero_reclamo']
+        serializer = ImagenReclamoSerializer(data=data)
 
-        imagen = data['imagen']
-        try:
-            ImagenReclamo.objects.create(reclamo=reclamo, imagen=imagen)
-        except:
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        else:
             return Response(
-                {'detail': 'Error interno'},
+                serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        return Response(
-            {'detail': 'La imagen se agregó exitosamente.'},
-            status=status.HTTP_201_CREATED
-        )
 
 
 
 class GetReclamosView(APIView):
-    '''Vista para obtener todos los reclamos de un vecino'''
+    '''Vista para obtener todos los reclamos'''
 
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        reclamos = Reclamo.objects.filter(vecino__usuario=user)
+        reclamos = Reclamo.objects.all()
         serializer = ReclamoSerializer(reclamos, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -384,7 +390,22 @@ class CrearDenunciaView(APIView):
         serializer = DenunciaSerializer(data=data)
 
         if serializer.is_valid():
-            serializer.save()
+            if data['destino'] == 'vecino':
+                try:
+                    denunciado = Vecino.objects.get(documento=data['denunciado'])
+                    serializer.save()
+                    denuncia = Denuncia.objects.get(id=serializer.data['id'])
+                    Denunciado.objects.create(denuncia=denuncia, denunciado=denunciado)
+                except Vecino.DoesNotExist:
+                    return Response(
+                        {'detail': 'No existe un vecino con ese documento'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            else:
+                serializer.save()
+                denuncia = Denuncia.objects.get(id=serializer.data['id'])
+                Denunciado.objects.create(denuncia=denuncia, comercio=data['denunciado'])
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -406,25 +427,23 @@ class DenunciaImagenView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        if DenunciaImagenView.objects.filter(denuncia=denuncia).count() >= 7:
+        if DenunciaImagen.objects.filter(denuncia=denuncia).count() >= 7:
             return Response(
                 {'detail': 'El usuario vecino llegó al límite de 7 imágenes.'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        imagen = data['imagen']
-        try:
-            DenunciaImagen.objects.create(denuncia=denuncia, imagen=imagen)
-        except:
+        data['denuncia'] = data['numero_denuncia']
+        serializer = DenunciaImagenSerializer(data=data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
             return Response(
-                {'detail': 'Error interno'},
+                serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        return Response(
-            {'detail': 'La imagen se agregó exitosamente.'},
-            status=status.HTTP_201_CREATED
-        )
 
 
 class GetDenunciaView(APIView):
@@ -573,4 +592,12 @@ class GetNotifications(APIView):
         user = request.user
         notifications = Notification.objects.filter(user=user)
         serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class ListaDesperfectos(APIView):
+    '''Obtiene una lista de todos los desperfectos registrados. Este endpoint está disponible para cualquier usuario, incluso sin autenticación.'''
+
+    def get(self, request):
+        desperfectos = Desperfecto.objects.all()
+        serializer = DesperfectoSerializer(desperfectos, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
