@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Barrio, Desperfecto, Rubro, Vecino, GMUser, Personal, Sitio, Reclamo, ImagenReclamo, ImagenPromocion, Promocion, UserRegisterCode,UserVecino,UserPersonal, MovimientoDenuncia, MovimientoReclamo, Denuncia, Denunciado
+from .models import Barrio, Desperfecto, Rubro, Vecino, GMUser, Personal, Sitio, Reclamo, ImagenReclamo, ImagenPromocion, Promocion, UserRegisterCode,UserVecino,UserPersonal, MovimientoDenuncia, MovimientoReclamo, Denuncia, Denunciado, Notification, PersonalRubro
 
 admin.site.register(Barrio)
 admin.site.register(Desperfecto)
@@ -18,6 +18,8 @@ admin.site.register(MovimientoDenuncia)
 admin.site.register(MovimientoReclamo)
 admin.site.register(Denuncia)
 admin.site.register(Denunciado)
+admin.site.register(Notification)
+admin.site.register(PersonalRubro)
 
 
 class GMUserAdmin(admin.ModelAdmin):

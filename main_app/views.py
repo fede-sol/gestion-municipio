@@ -1,13 +1,13 @@
 import random
 import string
 from rest_framework.response import Response
-from .serializers import UserSerializer, CustomTokenObtainPairSerializer, VecinoSerializer, PersonalSerializer, RubroSerializer, DesperfectoSerializer, BarrioSerializer, ReclamoSerializer, ImagenReclamoSerializer, DenunciaSerializer, DenunciaImagenSerializer, PromocionSerializer, PromocionImagenSerializer, NotificationSerializer, MovimientoReclamoSerializer
+from .serializers import UserSerializer, CustomTokenObtainPairSerializer, VecinoSerializer, PersonalSerializer, RubroSerializer, DesperfectoSerializer, BarrioSerializer, ReclamoSerializer, ImagenReclamoSerializer, DenunciaSerializer, DenunciaImagenSerializer, PromocionSerializer, PromocionImagenSerializer, NotificationSerializer, MovimientoReclamoSerializer, SitioSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import status
-from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode, UserVecino, UserPersonal, Denuncia, DenunciaImagen, Notification, Desperfecto, MovimientoReclamo, Denunciado
+from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode, UserVecino, UserPersonal, Denuncia, DenunciaImagen, Notification, Desperfecto, MovimientoReclamo, Denunciado, Rubro, Sitio
 from django.db import transaction
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -481,9 +481,24 @@ class GetDenunciasListView(APIView):
         user = request.user
 
         if tipo == 'generadas':
-            denuncias = Denuncia.objects.filter(denunciante__usuario=user)
+            try:
+                vecino = UserVecino.objects.get(user=user)
+                denuncias = Denuncia.objects.filter(denunciante=vecino.vecino)
+            except UserVecino.DoesNotExist:
+                return Response(
+                    {'detail': 'No existe un vecino con este usuario'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
         elif tipo == 'recibidas':
-            denuncias = Denuncia.objects.filter(denunciado__usuario=user)
+            try:
+                vecino = UserVecino.objects.get(user=user)
+                denunciados = Denunciado.objects.filter(denunciado=vecino.vecino)
+                denuncias = [denunciado.denuncia for denunciado in denunciados]
+            except UserVecino.DoesNotExist:
+                return Response(
+                    {'detail': 'No existe un vecino con este usuario'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
         else:
             return Response(
                 {'detail': 'Parámetro "tipo" no válido'},
@@ -550,10 +565,6 @@ class PromocionImagenView(APIView):
 
 class GetPromocionView(APIView):
     '''Vista para obtener una promoción por pk'''
-
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
-
     def get(self, request, pk):
         try:
             promocion = Promocion.objects.get(id=pk)
@@ -576,7 +587,7 @@ class GetPromocionListView(APIView):
     '''Obtiene una lista de todas las promociones registradas. Este endpoint está disponible para cualquier usuario, incluso sin autenticación.'''
 
     def get(self, request):
-        promociones = Promocion.objects.all()
+        promociones = Promocion.objects.filter(validado=True)
         serializer = PromocionSerializer(promociones, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -600,4 +611,18 @@ class ListaDesperfectos(APIView):
     def get(self, request):
         desperfectos = Desperfecto.objects.all()
         serializer = DesperfectoSerializer(desperfectos, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class RubroView(APIView):
+    '''Vista para obtener todos los rubros'''
+    def get(self, request):
+        rubros = Rubro.objects.all()
+        serializer = RubroSerializer(rubros, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class SitioView(APIView):
+    '''Vista para obtener todos los sitios'''
+    def get(self, request):
+        sitios = Sitio.objects.all()
+        serializer = SitioSerializer(sitios, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

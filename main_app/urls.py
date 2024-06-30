@@ -3,7 +3,7 @@ from . import views
 urlpatterns = [
     path('registro', views.VecinoRegisterView.as_view()),
     path('vecino/login', views.VecinoLoginView.as_view()),
-    path('personal/login/', views.PersonalLoginView.as_view()),
+    path('personal/login', views.PersonalLoginView.as_view()),
     path('personal/register/', views.PersonalRegisterView.as_view()),
     path('reclamo/agregar-imagen', views.ReclamoAddImage.as_view()),
     path('reclamos', views.GetReclamosView.as_view()),
@@ -21,5 +21,8 @@ urlpatterns = [
     re_path('promocion/(?P<pk>.+)/$', views.GetPromocionView.as_view()),
     path('promociones', views.GetPromocionListView.as_view()),
     path('desperfectos', views.ListaDesperfectos.as_view()),
+    path('rubros', views.RubroView.as_view()),
+    path('sitios', views.SitioView.as_view()),
+    path('notificaciones', views.GetNotifications.as_view()),
 
 ]

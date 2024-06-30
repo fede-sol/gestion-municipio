@@ -93,7 +93,7 @@ class Personal(models.Model):
     apellido = models.CharField(max_length=100)
     documento = models.CharField(max_length=20)
     sector = models.CharField(max_length=100)
-    categoria = models.CharField(max_length=100)
+    categoria = models.IntegerField()
     password = models.CharField(max_length=100)
     fechaIngreso = models.DateField(null=True, blank=True)
 
@@ -174,6 +174,23 @@ class Denuncia(models.Model):
                                               default=1)
     aceptaResponsabilidad = models.BooleanField(default=False,null=True, blank=True)
 
+    @property
+    def nombre_denunciado(self):
+        denunciado = Denunciado.objects.get(denuncia=self)
+        if denunciado.denunciado:
+            return denunciado.denunciado.nombre + ' ' + denunciado.denunciado.apellido
+        elif denunciado.comercio:
+            return denunciado.comercio
+        return '-'
+
+    @property
+    def nombre_sitio(self):
+        return self.sitio.descripcion
+
+    @property
+    def ubicacion(self):
+        return f"{self.sitio.calle} {self.sitio.numero}"
+
     def __str__(self):
         return f"Denuncia #{self.id}"
 
@@ -202,14 +219,38 @@ class MovimientoDenuncia(models.Model):
 class Promocion(models.Model):
     class Meta:
         verbose_name_plural = 'Promociones'
+    nombre = models.CharField(max_length=100,blank=True, null=True)
+    titulo = models.CharField(max_length=100,blank=True, null=True)
     descripcion = models.CharField(max_length=1000)
     horarios = models.CharField(max_length=30)
     vecino = models.ForeignKey(Vecino, on_delete=models.CASCADE)
     medioDeContacto = models.CharField(max_length=100)
     validado = models.BooleanField(default=False)
+    rubro = models.CharField(max_length=30, blank=True, null=True)
+    ubicacion = models.ForeignKey(Sitio, on_delete=models.CASCADE,blank=True, null=True)
 
     def __str__(self):
         return self.vecino.nombre + ' ' + self.vecino.apellido
+
+    @property
+    def banner(self):
+        return ImagenPromocion.objects.filter(promocion=self).first().imagen.url
+
+    @property
+    def nombre_vecino(self):
+        return self.vecino.nombre + ' ' + self.vecino.apellido
+
+    @property
+    def nombre_rubro(self):
+        return self.rubro.descripcion
+
+    @property
+    def nombre_ubicacion(self):
+        return self.ubicacion.descripcion
+
+    @property
+    def calles(self):
+        return f"{self.ubicacion.calle} {self.ubicacion.numero}"
 
 class ImagenReclamo(models.Model):
     imagen = models.ImageField(upload_to='reclamos/')
@@ -249,6 +290,12 @@ class Notification(models.Model):
     def __str__(self):
         return f"{self.user.email} - {self.title}"
 
+class PersonalRubro(models.Model):
+    personal = models.ForeignKey(Personal, on_delete=models.CASCADE)
+    rubro = models.ForeignKey(Rubro, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.personal.legajo} - {self.rubro.descripcion}"
 
 # Define clear and descriptive messages for each notification
 NOTIFICATION_MESSAGES = {

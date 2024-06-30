@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.conf import settings
-from .models import Reclamo, Vecino, Personal, Rubro, Desperfecto, Barrio, Denuncia, DenunciaImagen, Promocion, ImagenReclamo, ImagenPromocion, Notification, UserVecino, UserPersonal, MovimientoReclamo, MovimientoDenuncia
+from .models import Reclamo, Vecino, Personal, Rubro, Desperfecto, Barrio, Denuncia, DenunciaImagen, Promocion, ImagenReclamo, ImagenPromocion, Notification, UserVecino, UserPersonal, MovimientoReclamo, MovimientoDenuncia, Sitio, PersonalRubro
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
@@ -22,6 +22,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             data['nombre'] = personal.nombre
             data['apellido'] = personal.apellido
             data['legajo'] = personal.legajo
+
+            try:
+                rubro = PersonalRubro.objects.get(personal=personal)
+                data['especialidad'] = rubro.rubro.descripcion
+                data['especialidad_id'] = rubro.rubro.id
+            except PersonalRubro.DoesNotExist:
+                data['especialidad'] = None
 
 
         return data
@@ -93,7 +100,7 @@ class ImagenReclamoSerializer(serializers.ModelSerializer):
 class DenunciaSerializer(serializers.ModelSerializer):
     class Meta(object):
         model = Denuncia
-        fields = '__all__'
+        fields = ['id', 'descripcion', 'estado', 'sitio','nombre_denunciado','nombre_sitio','ubicacion']
 
 
 class DenunciaImagenSerializer(serializers.ModelSerializer):
@@ -105,7 +112,7 @@ class DenunciaImagenSerializer(serializers.ModelSerializer):
 class PromocionSerializer(serializers.ModelSerializer):
     class Meta(object):
         model = Promocion
-        fields = '__all__'
+        fields = ['id', 'nombre','titulo', 'horarios' , 'vecino', 'descripcion', 'validado', 'medioDeContacto','rubro','ubicacion','nombre_vecino','nombre_rubro','nombre_ubicacion', 'banner', 'calles']
 
 
 class PromocionImagenSerializer(serializers.ModelSerializer):
@@ -127,4 +134,9 @@ class MovimientoReclamoSerializer(serializers.ModelSerializer):
 class MovimientoDenunciaSerializer(serializers.ModelSerializer):
     class Meta(object):
         model = MovimientoDenuncia
+        fields = '__all__'
+
+class SitioSerializer(serializers.ModelSerializer):
+    class Meta(object):
+        model = Sitio
         fields = '__all__'
