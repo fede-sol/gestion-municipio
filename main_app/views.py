@@ -1,13 +1,13 @@
 import random
 import string
 from rest_framework.response import Response
-from .serializers import UserSerializer, CustomTokenObtainPairSerializer, VecinoSerializer, PersonalSerializer, RubroSerializer, DesperfectoSerializer, BarrioSerializer, ReclamoSerializer, ImagenReclamoSerializer, DenunciaSerializer, DenunciaImagenSerializer, PromocionSerializer, PromocionImagenSerializer, NotificationSerializer, MovimientoReclamoSerializer, SitioSerializer
+from .serializers import UserSerializer, CustomTokenObtainPairSerializer, VecinoSerializer, PersonalSerializer, RubroSerializer, DesperfectoSerializer, BarrioSerializer, ReclamoSerializer, ImagenReclamoSerializer, DenunciaSerializer, DenunciaImagenSerializer, PromocionSerializer, PromocionImagenSerializer, NotificationSerializer, MovimientoReclamoSerializer, SitioSerializer, PromocionImagenSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import status
-from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode, UserVecino, UserPersonal, Denuncia, DenunciaImagen, Notification, Desperfecto, MovimientoReclamo, Denunciado, Rubro, Sitio
+from .models import Personal, Reclamo, Vecino, ImagenReclamo, ImagenPromocion, Promocion, Barrio, UserRegisterCode, UserVecino, UserPersonal, Denuncia, DenunciaImagen, Notification, Desperfecto, MovimientoReclamo, Denunciado, Rubro, Sitio, PersonalRubro
 from django.db import transaction
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -374,7 +374,13 @@ class GetReclamosView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        reclamos = Reclamo.objects.all()
+        user = request.user
+        if user.user_type == 1:
+            reclamos = Reclamo.objects.all()
+        else:
+            personal = UserPersonal.objects.get(user=user)
+            rubro = PersonalRubro.objects.get(personal=personal.personal)
+            reclamos = Reclamo.objects.filter(desperfecto__rubro=rubro.rubro)
         serializer = ReclamoSerializer(reclamos, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -517,6 +523,7 @@ class CreatePromocionView(APIView):
 
     def post(self, request):
         data = request.data
+        print(data)
         serializer = PromocionSerializer(data=data)
 
         if serializer.is_valid():
@@ -548,19 +555,18 @@ class PromocionImagenView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        imagen = data['imagen']
-        try:
-            ImagenPromocion.objects.create(promocion=promocion, imagen=imagen)
-        except:
+        data['promocion'] = data['numero_promocion']
+        serializer = PromocionImagenSerializer(data=data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        else:
             return Response(
-                {'detail': 'Error interno'},
+                serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        return Response(
-            {'detail': 'La imagen se agregó exitosamente.'},
-            status=status.HTTP_201_CREATED
-        )
 
 
 class GetPromocionView(APIView):

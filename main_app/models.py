@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.models import BaseUserManager
 from django.dispatch import receiver
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 import random
 import string
 
@@ -130,7 +130,7 @@ class Reclamo(models.Model):
       (2, 'Abierto'),
       (3, 'Cerrado'),
     )
-    vecino = models.ForeignKey(Vecino, on_delete=models.CASCADE, db_column='documento')
+    vecino = models.ForeignKey(Vecino, on_delete=models.CASCADE, db_column='documento',null=True, blank=True)
     sitio = models.ForeignKey(Sitio, on_delete=models.CASCADE)
     desperfecto = models.ForeignKey(Desperfecto, on_delete=models.CASCADE)
     descripcion = models.TextField()
@@ -141,6 +141,10 @@ class Reclamo(models.Model):
     @property
     def nombre_vecino(self):
         return self.vecino.nombre + ' ' + self.vecino.apellido
+
+    @property
+    def nombre_personal(self):
+        return self.personal.nombre + ' ' + self.personal.apellido
 
     @property
     def nombre_sitio(self):
@@ -222,7 +226,7 @@ class Promocion(models.Model):
     nombre = models.CharField(max_length=100,blank=True, null=True)
     titulo = models.CharField(max_length=100,blank=True, null=True)
     descripcion = models.CharField(max_length=1000)
-    horarios = models.CharField(max_length=30)
+    horarios = models.TextField()
     vecino = models.ForeignKey(Vecino, on_delete=models.CASCADE)
     medioDeContacto = models.CharField(max_length=100)
     validado = models.BooleanField(default=False)
@@ -311,8 +315,8 @@ NOTIFICATION_MESSAGES = {
 }
 
 
-@receiver(post_save, sender=Reclamo)
-def create_reclamo_notification(sender, instance, created, **kwargs):
+@receiver(pre_save, sender=Reclamo)
+def create_reclamo_notification(sender, instance, raw, **kwargs):
     """
     Creates a notification for the Reclamo owner when its state changes.
 
@@ -323,23 +327,37 @@ def create_reclamo_notification(sender, instance, created, **kwargs):
         kwargs (dict): Additional arguments passed to the signal handler.
     """
 
-    if created:
-        return  # Don't create notification for initial creation
 
-    old_state = Reclamo.objects.filter(pk=instance.pk).get().estado
+    try:
+        old_state = Reclamo.objects.filter(pk=instance.pk).get().estado
+    except Reclamo.DoesNotExist:
+        old_state = None
+
     new_state = instance.estado
 
     if old_state != new_state:
         message = NOTIFICATION_MESSAGES['Reclamo'].get(new_state)
+        try:
+            user = UserVecino.objects.get(vecino=instance.vecino)
+        except UserVecino.DoesNotExist:
+            try:
+                user = UserPersonal.objects.get(personal=instance.personal)
+            except UserPersonal.DoesNotExist:
+                return
+        if instance.id:
+            id = instance.id
+        else:
+            id = Reclamo.objects.filter(idReclamoUnificado=instance.idReclamoUnificado).order_by('-id').first().id+1
+
         Notification.objects.create(
-            user=instance.vecino.user,
-            title="Actualización de su reclamo",
+            user=user.user,
+            title="Actualización de su reclamo número " + str(id),
             message=message,
         )
 
 
-@receiver(post_save, sender=Denuncia)
-def create_denuncia_notification(sender, instance, created, **kwargs):
+@receiver(pre_save, sender=Denuncia)
+def create_denuncia_notification(sender, instance, raw, **kwargs):
     """
     Creates a notification for the Denuncia owner when its state changes.
 
@@ -350,16 +368,22 @@ def create_denuncia_notification(sender, instance, created, **kwargs):
         kwargs (dict): Additional arguments passed to the signal handler.
     """
 
-    if created:
-        return  # Don't create notification for initial creation
+    try:
+        old_state = Denuncia.objects.get(id=instance.id).estado
+    except Denuncia.DoesNotExist:
+        old_state = None
 
-    old_state = Denuncia.objects.filter(pk=instance.pk).get().estado
     new_state = instance.estado
+
 
     if old_state != new_state:
         message = NOTIFICATION_MESSAGES['Denuncia'].get(new_state)
-        Notification.objects.create(
-            user=instance.denunciante.user,
-            title="Actualización de su denuncia",
-            message=message,
-        )
+        try:
+            user = UserVecino.objects.get(vecino=instance.denunciante)
+            Notification.objects.create(
+                user=user.user,
+                title="Actualización de su denuncia número " + str(instance.id),
+                message=message,
+            )
+        except UserVecino.DoesNotExist:
+            pass

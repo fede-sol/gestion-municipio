@@ -53,6 +53,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             token['legajo'] = personal.legajo
             token['rol'] = 'personal'
 
+            try:
+                rubro = PersonalRubro.objects.get(personal=personal)
+                token['especialidad'] = rubro.rubro.descripcion
+                token['especialidad_id'] = rubro.rubro.id
+            except PersonalRubro.DoesNotExist:
+                token['especialidad'] = None
+
 
         return token
 
@@ -89,7 +96,7 @@ class BarrioSerializer(serializers.ModelSerializer):
 class ReclamoSerializer(serializers.ModelSerializer):
     class Meta(object):
         model = Reclamo
-        fields = ['id', 'descripcion', 'estado', 'vecino', 'personal', 'desperfecto', 'sitio','idReclamoUnificado','nombre_vecino','nombre_sitio','ubicacion']
+        fields = ['id', 'descripcion', 'estado', 'vecino', 'personal', 'desperfecto', 'sitio','idReclamoUnificado','nombre_vecino','nombre_sitio','ubicacion','nombre_personal']
 
 class ImagenReclamoSerializer(serializers.ModelSerializer):
     class Meta(object):
@@ -100,7 +107,7 @@ class ImagenReclamoSerializer(serializers.ModelSerializer):
 class DenunciaSerializer(serializers.ModelSerializer):
     class Meta(object):
         model = Denuncia
-        fields = ['id', 'descripcion', 'estado', 'sitio','nombre_denunciado','nombre_sitio','ubicacion']
+        fields = ['id', 'descripcion', 'estado', 'sitio','nombre_denunciado','nombre_sitio','ubicacion','denunciante','aceptaResponsabilidad']
 
 
 class DenunciaImagenSerializer(serializers.ModelSerializer):
