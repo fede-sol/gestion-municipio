@@ -157,6 +157,14 @@ class Reclamo(models.Model):
     def __str__(self):
         return f"Reclamo #{self.id}"
 
+    def verificar_unificacion(self):
+        # Buscar reclamos con el mismo sitio y desperfecto
+        reclamos_similares = Reclamo.objects.filter(sitio=self.sitio, desperfecto=self.desperfecto)
+        if reclamos_similares.count() >= 3:
+            # Unificar reclamos
+            id_unificado = reclamos_similares.first().id
+            reclamos_similares.update(idReclamoUnificado=id_unificado)
+
 class MovimientoReclamo(models.Model):
     reclamo = models.ForeignKey(Reclamo, on_delete=models.CASCADE)
     responsable = models.ForeignKey(Personal, on_delete=models.CASCADE)
@@ -389,3 +397,7 @@ def create_denuncia_notification(sender, instance, raw, **kwargs):
             )
         except UserVecino.DoesNotExist:
             pass
+
+@receiver(post_save, sender=Reclamo)
+def unificar_reclamos(sender, instance, **kwargs):
+    instance.verificar_unificacion()
