@@ -208,7 +208,8 @@ class Denunciado(models.Model):
 
 
 class DenunciaImagen(models.Model):
-    imagen = models.ImageField(upload_to='denuncias/')
+    imagen = models.ImageField(upload_to='denuncias/',blank=True, null=True)
+    archivo = models.FileField(upload_to='denuncias/',blank=True, null=True)
     denuncia = models.ForeignKey(Denuncia, on_delete=models.CASCADE)
 
 class MovimientoDenuncia(models.Model):
