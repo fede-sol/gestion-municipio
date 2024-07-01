@@ -347,7 +347,8 @@ def create_reclamo_notification(sender, instance, raw, **kwargs):
         if instance.id:
             id = instance.id
         else:
-            id = Reclamo.objects.all().order_by('-id').first().id+1
+            reclamo = Reclamo.objects.all().order_by('-id').first()
+            id = reclamo.id + 1 if reclamo else 1
 
         Notification.objects.create(
             user=user.user,
